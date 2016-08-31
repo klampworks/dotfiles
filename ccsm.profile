@@ -27,6 +27,9 @@ s0_bg_color2 = #000000ff;
 [3d]
 s0_manual_only = false
 
+[decoration]
+as_command = emerald --replace
+
 [rotate]
 as_edge_flip_pointer = true
 as_initiate_button = <TopEdge>Button1
