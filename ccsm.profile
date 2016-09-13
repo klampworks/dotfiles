@@ -3,6 +3,7 @@ s0_open_effects = animationaddon:Beam Up;animationaddon:Burn;animation:Fade;
 s0_open_durations = 500;500;150;
 s0_close_effects = animationaddon:Explode;animationaddon:Burn;animation:Fade;
 s0_close_durations = 600;500;150;
+s0_focus_effects = animation:Dodge;
 
 [core]
 as_active_plugins = core;ccp;move;resize;place;decoration;regex;commands;imgjpeg;animation;wobbly;animationaddon;wallpaper;cube;scale;3d;rotate;
