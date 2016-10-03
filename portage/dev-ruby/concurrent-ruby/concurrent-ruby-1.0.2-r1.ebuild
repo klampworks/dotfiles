@@ -27,11 +27,11 @@ ruby_add_bdepend "test? ( >=dev-ruby/timecop-0.7.4 )"
 RUBY_PATCHES=( ${P}-alpha.patch )
 
 all_ruby_prepare() {
-	# Remove edge files as defined in support/file_map.rb
-	rm -rf {lib,spec}/concurrent/{actor,channel,edge}* \
-	   lib/concurrent/{concurrent-edge,lazy_register.rb} \
-		spec/concurrent/lazy_register_spec.rb || die
-	sed -i -e '/concurrent-edge/ s:^:#:' spec/spec_helper.rb || die
+	## Remove edge files as defined in support/file_map.rb
+	#rm -rf {lib,spec}/concurrent/{actor,channel,edge}* \
+	#   lib/concurrent/{concurrent-edge,lazy_register.rb} \
+	#	spec/concurrent/lazy_register_spec.rb || die
+	#sed -i -e '/concurrent-edge/ s:^:#:' spec/spec_helper.rb || die
 
 	# Remove specs for the ext gem
 	rm -rf spec/concurrent/atomic || die
