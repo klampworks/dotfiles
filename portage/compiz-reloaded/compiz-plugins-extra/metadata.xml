@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "http://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+<maintainer type="project">
+    <email>noone@nowhere.com</email>
+    <name>Un-maintained</name>
+  </maintainer>
+<longdescription lang="en">
+&gt;Package with several compiz-fusion plugins:
+addhelper, bench, crashhandler, cubecaps, cubereflex, extrawm, fadedesktop, firepaint, gears,
+goto-viewport, group, mblur, reflex, scalefilter, showdesktop, splash, trailfocus, widget.
+</longdescription>
+</pkgmetadata>
