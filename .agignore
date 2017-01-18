@@ -1,0 +1,12 @@
+*.html
+*.js
+*.css
+*.tex
+*.map
+*.pdf
+cscope.out
+*.make
+*.cmake
+*.includecache
+*.internal
+
