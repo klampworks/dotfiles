@@ -70,7 +70,6 @@ def check_battery_level_and_flash_if_low
   end
 
   percent = get_battery_percentage
-  percent = 30
   times = (100 - percent) / 10
   if percent % 10 == 0 and percent != last_percent then
     flash 2
