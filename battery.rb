@@ -1,58 +1,69 @@
-info_file = '/proc/acpi/battery/BAT0/info'
-state_file = '/proc/acpi/battery/BAT0/state'
-warning_level = 100.0
-ohshit_level = 5.0
+$info_file = '/proc/acpi/battery/BAT0/info'
+$state_file = '/proc/acpi/battery/BAT0/state'
+$warning_level = 100.0
+$ohshit_level = 5.0
+$display = `ps -aux | grep /usr/bin/X | grep -oP ' :[^ ]+' | grep -oP ':[^ ]+' | head -1`
 
-display = `ps -aux | grep /usr/bin/X | grep -oP ' :[^ ]+' | grep -oP ':[^ ]+' | head -1`
-
-def screen_red display
-  red_cmd = "DISPLAY=#{display.chomp} xrandr --output eDP1 --gamma 2:1:1"
+def screen_red
+  red_cmd = "DISPLAY=#{$display.chomp} xrandr --output eDP1 --gamma 2:1:1"
   system red_cmd
 end
 
-def screen_reset display
-  reset_cmd = "DISPLAY=#{display.chomp} xrandr --output eDP1 --gamma 1:1:1"
+def screen_reset
+  reset_cmd = "DISPLAY=#{$display.chomp} xrandr --output eDP1 --gamma 1:1:1"
     system reset_cmd
 end
 
-def flash times, display
+def flash times
 
   gap = 0.5
 
   (1..times).each do
-    screen_red display
+    screen_red
     sleep gap
-    screen_reset display
+    screen_reset
     sleep gap
   end
 end
 
-info = File.read info_file
-state = File.read state_file
+def get_full
+  info = File.read $info_file
 
-m = /last full capacity:\s*(\d+)/.match info
+  m = /last full capacity:\s*(\d+)/.match info
 
-if not m then
-  puts "[!] Could not read full capacity from #{info_file}"
-  exit 1
+  if not m then
+    puts "[!] Could not read full capacity from #{info_file}"
+    0
+  else
+    m[1]
+  end
 end
 
-full = m[1]
+def get_now
+  state = File.read $state_file
 
-m = /remaining capacity:\s*(\d+)/.match state
-if not m then
-  puts "[!] Could not read current capacity from #{state_file}"
-  exit 1
+  m = /remaining capacity:\s*(\d+)/.match state
+  if not m then
+    puts "[!] Could not read current capacity from #{state_file}"
+    0
+  else
+    now = m[1]
+  end
 end
 
-now = m[1]
+def check_battery_level_and_flash_if_low
+  full = get_full
+  now = get_now
 
-percent = (now.to_f / full.to_f) * 100
+  percent = (now.to_f / full.to_f) * 100
 
-if percent < warning_level then
-  flash 3, display
+  if percent <= $warning_level then
+    flash 3
+  end
+
+  if percent < $ohshit_level then
+    screen_red
+  end
 end
 
-if percent < ohshit_level then
-  screen_red display
-end
+check_battery_level_and_flash_if_low
