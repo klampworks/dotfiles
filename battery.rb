@@ -1,3 +1,5 @@
+require 'optparse'
+
 $info_file = '/proc/acpi/battery/BAT0/info'
 $state_file = '/proc/acpi/battery/BAT0/state'
 $warning_level = 100.0
@@ -66,4 +68,18 @@ def check_battery_level_and_flash_if_low
   end
 end
 
-check_battery_level_and_flash_if_low
+check = false
+optparse = OptionParser.new do |opts|
+  opts.banner = "Usage: #{$0}"
+
+  opts.on('-c', '--check', 'Check battery level and flash screen if it is low') do |p|
+    check = true
+  end
+end
+
+optparse.parse!
+
+if check then
+  check_battery_level_and_flash_if_low
+end
+
