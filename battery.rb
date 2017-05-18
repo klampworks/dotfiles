@@ -53,14 +53,28 @@ def get_now
   end
 end
 
-def check_battery_level_and_flash_if_low
+def get_battery_percentage
   full = get_full
   now = get_now
 
-  percent = (now.to_f / full.to_f) * 100
+  (now.to_f / full.to_f) * 100
+end
 
-  if percent <= $warning_level then
-    flash 3
+def check_battery_level_and_flash_if_low
+
+  last_file = File.expand_path "~/.battery"
+  last_percent = if File.exist? last_file then
+    File.read(last_file).to_f
+  else
+    0.0
+  end
+
+  percent = get_battery_percentage
+  percent = 30
+  times = (100 - percent) / 10
+  if percent % 10 == 0 and percent != last_percent then
+    flash 2
+    File.open(last_file, 'w') { |file| file.write(percent) }
   end
 
   if percent < $ohshit_level then
@@ -69,11 +83,16 @@ def check_battery_level_and_flash_if_low
 end
 
 check = false
+opt_print = false
+
 optparse = OptionParser.new do |opts|
   opts.banner = "Usage: #{$0}"
 
   opts.on('-c', '--check', 'Check battery level and flash screen if it is low') do |p|
     check = true
+  end
+  opts.on('-p', '--print', 'Print battery percentage') do |p|
+    opt_print = true
   end
 end
 
@@ -83,3 +102,6 @@ if check then
   check_battery_level_and_flash_if_low
 end
 
+if opt_print then
+  print get_battery_percentage
+end
