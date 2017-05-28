@@ -1,0 +1,8 @@
+xkbcomp -w 0 ~/dotfiles/HP_Chromebook_14/x11_keymap.map $DISPLAY
+
+#edit
+#startfluxbox &
+compiz &>compiz.log &
+p=$!
+sakura &
+wait $p
