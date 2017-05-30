@@ -1,0 +1,25 @@
+
+{{settings}}
+for-privoxy-version=3.0.11
+
+{ +block }
+/
+
+{ -block }
+.facebook.com
+.fbcdn.net
+
+.meetup.com
+.meetupstatic.com
+
+.linkedin.com
+.licdn.com
+
+.eventbrite.co.uk
+.evbstatic.com
+.evbuc.com
+
+.google.com
+.google.co.uk
+.gstatic.com
+.ggpht.com
