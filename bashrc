@@ -33,6 +33,28 @@ function eix_search()
   EIX_LIMIT=0 eix "$1" --format '(green)<name>:(red) <description>\n'
 }
 
+function fix_date()
+{
+    if [[ -z "$1" ]]
+    then
+        echo "Usage: fix_date <ip|hostname> [Linux|BSD]"
+        echo " Linux date syntax is default."
+        echo ""
+        echo " e.g.: fix_date 192.168.100.5"
+        echo " => ssh root@192.168.100.5 \"date -s @$(date +%s)\""
+        echo " e.g.: fix_date my-bsd-host bsd"
+        echo " => ssh root@my-bsd-host \"date $(date +%y%m%d%H%M)\""
+        return
+    fi
+
+    if [[ "$2" = "bsd" || "$2" = "BSD" ]]
+    then
+      ssh root@"$1" "date $(date +%y%m%d%H%M)"
+    else
+      ssh root@"$1" "date -s @$(date +%s)"
+    fi
+}
+
 # Send stdout to X11 Clipboard
 # e.g. `cat my_email.txt | x`
 alias x='xsel -b'
