@@ -42,14 +42,14 @@ fi
 
 if [[ ! -e "$filename".asc ]]
 then
-  wget "$1".asc
+  torify wget "$1".asc
 else
   echo "[+] $filename.asc already exists, delete it to redownload."
 fi
 
 if [[ ! -e "$filename".asc ]]
 then
-  echo "[!] Failed to download $filename.asc from $1.asc"
+  echo "[!] Failed to download $filename.asc from $1.asc (is Tor running?)"
   exit 5
 fi
 
