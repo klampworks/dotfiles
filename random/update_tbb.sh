@@ -81,5 +81,6 @@ echo "[+] Need sudo password to set PAX markings..."
 sudo paxctl-ng -m /home/tbb/tor-browser_en-US/Browser/firefox
 
 cd ..
+rm tbb-latest
 ln -sf "tbb-$version" tbb-latest
 echo "[+] All good kthxbai ^_^d"
