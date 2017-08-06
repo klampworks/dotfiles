@@ -97,6 +97,45 @@ if argc() == 0
   autocmd VimEnter * call Start()
 endif
 
+function! Banner()
+
+ruby <<EOF
+
+  def banner
+    line = $curbuf.line
+
+    if /-+\[ (?<text>[^\]]+)\]-+/ =~ line then
+      line = text.gsub(/\W+$/, '')
+    end
+
+    len = line.length
+    max = 80
+
+    pad = (max - (len + 4))
+
+    if pad < 2 then
+      puts "Line too long."
+      return
+    end
+
+    pad /= 2
+
+    new_line = ""
+    new_line += "-" * pad
+    new_line += "-" if len % 2 != 0
+    new_line += "[ " + line + " ]"
+    new_line += "-" * pad
+
+    line_number = $curbuf.line_number
+    $curbuf[line_number] = new_line
+  end
+
+  banner
+EOF
+endfunction
+
+nmap <C-b> :call Banner()<CR>
+
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
