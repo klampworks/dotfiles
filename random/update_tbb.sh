@@ -42,7 +42,7 @@ fi
 
 if [[ ! -e "$filename".asc ]]
 then
-  torify wget "$1".asc
+  wget "$1".asc
 else
   echo "[+] $filename.asc already exists, delete it to redownload."
 fi
@@ -81,6 +81,13 @@ echo "[+] Need sudo password to set PAX markings..."
 sudo paxctl-ng -m /home/tbb/tor-browser_en-US/Browser/firefox
 
 cd ..
+
+echo "[+] Copying prefs.js from old profile..."
+old_prefs_path="tbb-latest/tor-browser_en-US/Browser/TorBrowser/Data/Browser/profile.default/prefs.js"
+new_prefs_path="tbb-$version/tor-browser_en-US/Browser/TorBrowser/Data/Browser/profile.default/prefs.js"
+echo "    $old_prefs_path --> $new_prefs_path"
+cp "$old_prefs_path" "$new_prefs_path"
+
 rm tbb-latest
 ln -sf "tbb-$version" tbb-latest
 echo "[+] All good kthxbai ^_^d"
