@@ -1,0 +1,13 @@
+#!/bin/bash
+if [[  -z "$1" || -z "$2" ]]
+then
+	echo "Usage: $0 <output.ext> <input extension>"
+	echo "\te.g. $0 output.mp3 flac"
+	echo "Join all media files with a file extenstion into a single file."
+	exit 1
+fi
+
+for f in *."$2"; do echo "file '$f'"; done > todo
+ffmpeg -safe 0 -f concat -i todo -c copy "$1"
+
+
