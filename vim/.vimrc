@@ -1,4 +1,3 @@
-execute pathogen#infect()
 scriptencoding utf-8
 
 " Highlight search terms.

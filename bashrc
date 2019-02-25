@@ -30,7 +30,7 @@ stty ixoff -ixon
 # Coloured search for Gentoo packages
 function eix_search()
 {
-  EIX_LIMIT=0 eix "$1" --format '(green)<name>:(red) <description>\n'
+  EIX_LIMIT=0 eix --format '(green)<category>/<name>:(red) <description>\n' "$@"
 }
 
 function fix_date()
@@ -65,3 +65,5 @@ alias gdb="gdb -q"
 # When Dolphin is started outside KDE it will not display any icons.
 # Here is a fix for that.
 alias dolphin="XDG_CURRENT_DESKTOP=GNOME dolphin"
+
+. ~/.local-bashrc

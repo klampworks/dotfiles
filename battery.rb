@@ -1,7 +1,7 @@
 require 'optparse'
 
-$info_file = '/proc/acpi/battery/BAT0/info'
-$state_file = '/proc/acpi/battery/BAT0/state'
+$info_file = '/proc/acpi/battery/BAT1/info'
+$state_file = '/proc/acpi/battery/BAT1/state'
 $warning_level = 100.0
 $ohshit_level = 5.0
 $display = `ps -aux | grep /usr/bin/X | grep -oP ' :[^ ]+' | grep -oP ':[^ ]+' | head -1`
