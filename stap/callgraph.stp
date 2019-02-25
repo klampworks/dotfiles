@@ -1,0 +1,52 @@
+#! /usr/bin/env stap
+
+global idx
+global callstack
+global watermark
+global mark
+
+function add_path_c(src, dst, colour) {
+  printf("\"%s\" -> \"%s\" [color=\"%s\"];\n", src, dst, colour)
+}
+
+probe $1.call {
+  if (ppfunc() == @2) {
+    printf("%s [fillcolor=red];", ppfunc());
+    watermark = idx
+    mark = -1
+  }
+
+  idx += 1
+  callstack[idx] = ppfunc()
+}
+
+probe $1.return {
+  idx -= 1
+
+  if (watermark >= 0) {
+
+    if (idx > watermark) {
+      if (mark < 0) {
+        printf("%s [color=red];", ppfunc());
+        add_path_c(callstack[idx], ppfunc(), "red")
+      } else {
+        add_path_c(callstack[idx], ppfunc(), "black")
+      }
+    } else {
+      printf("%s [color=green];", callstack[idx]);
+      add_path_c(callstack[idx], ppfunc(), "green")
+      watermark -= 1
+      mark = 1
+    }
+
+  } else {
+    add_path_c(callstack[idx], ppfunc(), "black")
+  }
+}
+
+probe begin {
+  callstack[0] = "unknown"
+  watermark = -1
+  mark = -1
+}
+

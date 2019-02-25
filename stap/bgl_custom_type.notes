@@ -1,0 +1,205 @@
+
+Although the Boost Graph Library has great support for reading and writing graphs in Graphiz dot format, this is just a bolt on feature and internally, many of the Dot vertex and edge properties are not built into BGL. Adding new properties is fairly straightforward if they are built in types such as std::string or int, float etc. But adding a user defined class is not obvious so I thought I would write about it here.
+
+Here is some code to parse a string in `.dot` format into BGL's internal graph representation and then turn it back into `.dot` format and write to stdout.
+
+--------------------------------------------------------------------------------
+    #include <fstream>
+    #include <boost/graph/graphviz.hpp>
+    #include <boost/graph/properties.hpp>
+
+    typedef boost::property < boost::vertex_name_t, std::string > vertex_p;
+    typedef boost::no_property edge_p;
+    typedef boost::property < boost::graph_name_t, std::string > graph_p;
+
+    typedef boost::adjacency_list < boost::vecS, boost::vecS, boost::directedS,
+      vertex_p, edge_p, graph_p > graph_t;
+
+    int main(int argc, char **argv)
+    {
+      graph_t graph(0);
+      boost::dynamic_properties dp;
+
+      boost::property_map<graph_t, boost::vertex_name_t>::type name =
+        get(boost::vertex_name, graph);
+      dp.property("node_id", name);
+
+      boost::ref_property_map<graph_t*,std::string>
+        gname(get_property(graph,boost::graph_name));
+      dp.property("name", gname);
+
+      std::istringstream gvgraph(argv[1]);
+      boost::read_graphviz(gvgraph,graph,dp,"node_id");
+      boost::write_graphviz_dp(std::cout, graph, dp);
+    }
+--------------------------------------------------------------------------------
+
+Compile with `clang++ bgl_min.cpp -lboost_graph -lboost_regex`. It parses the first command line argument as `dot` format so example usage would be `./a.out 'digraph { graph [name = "graphname"] a c e }'`.
+
+The catch comes if we add a valid `dot` vertex property to the input which BGL does not know about.
+
+    $  ./a.out 'digraph { graph [name = "graphname"] a c e [color="red"] }'
+    terminate called after throwing an instance of 'boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::property_not_found> >'
+      what():  Property not found: color.
+    Aborted
+
+BGL properties are defined in `boost/graph/properties.hpp`. There are some macros defined in the same file for adding new properties. To define a new property `vertex_my_colour_t` we can use the following:
+
+    namespace boost {
+      enum vertex_my_colour_t { vertex_my_colour };
+      template <> struct property_kind<vertex_my_colour_t> {
+          typedef vertex_property_tag type;
+      };
+    }
+
+This gives us a `key` type for the property map. We can then add our new peoperty to the vertex properties list. At this point we need to decide on a `value` type. We'll use `std::string` at first just to get it working.
+
+    typedef boost::property < boost::vertex_name_t, std::string,
+      boost::property < boost::vertex_my_colour_t, std::string > > vertex_p;
+
+The last peice is to parse the input `color` `dot` property into a BGL `vertex_my_colour_t` property.
+
+    boost::property_map<graph_t, boost::vertex_my_colour_t>::type my_colour =
+      get(boost::vertex_my_colour, graph);
+    dp.property("color", my_colour);
+
+This is the result:
+
+    $  ./a.out 'digraph { graph [name = "graphname"]  a c e [color="red"] }'
+    digraph G {
+    name=graphname;
+    a [color=""];
+    c [color=""];
+    e [color=red];
+    }
+
+Interesting, but what if we want a default `color` besids `""`?
+
+Lets define a new class to use instead of `std::string` and make the default constructor set it to "blue".
+
+    struct Colour {
+      std::string s;
+      Colour() : s("blue") {}
+    };
+
+    ...
+
+    typedef boost::property < boost::vertex_name_t, std::string,
+      boost::property < boost::vertex_my_colour_t, Colour > > vertex_p;
+
+If we try to compile:
+
+    $  clang++ bgl_custom_type.cpp -lboost_graph -lboost_regex
+    In file included from bgl_custom_type.cpp:2:
+    In file included from /usr/include/boost/graph/graphviz.hpp:25:
+    /usr/include/boost/property_map/dynamic_property_map.hpp:180:9: error: invalid
+          operands to binary expression ('std::ostringstream' (aka
+          'basic_ostringstream<char>') and 'Colour')
+
+The reason this happens is because BGL uses `boost::lexical_cast` to turn the input strings into C++ types. From the [documentation](http://www.boost.org/doc/libs/1_48_0/doc/html/boost_lexical_cast/synopsis.html):
+
+     Returns the result of streaming arg into a standard library string-based stream and then out as a Target object. Where Target is either std::string or std::wstring, stream extraction takes the whole content of the string, including spaces, rather than relying on the default operator>> behavior. If the conversion is unsuccessful, a bad_lexical_cast exception is thrown.
+
+    The requirements on the argument and result types are:
+
+        Source is OutputStreamable, meaning that an operator<< is defined that takes a std::ostream or std::wostream object on the left hand side and an instance of the argument type on the right.
+        Target is InputStreamable, meaning that an operator>> is defined that takes a std::istream or std::wistream object on the left hand side and an instance of the result type on the right.
+        Target is CopyConstructible [20.1.3].
+        Target is DefaultConstructible, meaning that it is possible to default-initialize an object of that type [8.5, 20.1.4].
+
+Our `Colour` class has a default constructor (sets the colour to "blue"), and a compiler generated Copy Constructor. What it is missing is the shift operators. Lets add some stub ones and see if it works.
+
+    std::istream& operator>>(std::istream &is, Colour &obj) {
+      obj.s = "green";
+      return is;
+    }
+
+    std::ostream& operator<<(std::ostream &os, const Colour &obj) {
+      os << obj.s;
+      return os;
+    }
+
+This compiles fine but if we run it we get a runtime error:
+
+    ./a.out 'digraph { graph [name = "graphname"]  a c e [color="red"] }'
+    terminate called after throwing an instance of 'boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::bad_lexical_cast> >'
+      what():  bad lexical cast: source type value could not be interpreted as target
+    Aborted
+
+This error was my predominant motivation for writing this post since it was not at all obvious to me what was wrong. The answer is very simple, the Boost libraries assume that if no data was taken from the `std::istream` by the right shift operator, then the parsing must have failed. Try something like this instead:
+
+    std::istream& operator>>(std::istream &is, Colour &obj) {
+      is >> obj.s;
+      return is;
+    }
+
+Here is the full example:
+
+    #include <fstream>
+    #include <boost/graph/graphviz.hpp>
+    #include <boost/graph/properties.hpp>
+
+    struct Colour {
+      std::string s;
+      Colour() : s("blue") {}
+    };
+
+    std::istream& operator>>(std::istream &is, Colour &obj) {
+      is >> obj.s;
+      return is;
+    }
+
+    std::ostream& operator<<(std::ostream &os, const Colour &obj) {
+      os << obj.s;
+      return os;
+    }
+
+    namespace boost {
+      enum vertex_my_colour_t { vertex_my_colour };
+      template <> struct property_kind<vertex_my_colour_t> {
+          typedef vertex_property_tag type;
+      };
+    }
+
+    typedef boost::property < boost::vertex_name_t, std::string,
+      boost::property < boost::vertex_my_colour_t, Colour > > vertex_p;
+    typedef boost::no_property edge_p;
+    typedef boost::property < boost::graph_name_t, std::string > graph_p;
+
+    typedef boost::adjacency_list < boost::vecS, boost::vecS, boost::directedS,
+      vertex_p, edge_p, graph_p > graph_t;
+
+    int main(int argc, char **argv)
+    {
+      graph_t graph(0);
+      boost::dynamic_properties dp;
+
+      boost::property_map<graph_t, boost::vertex_name_t>::type name =
+        get(boost::vertex_name, graph);
+      dp.property("node_id", name);
+
+      boost::ref_property_map<graph_t*,std::string>
+        gname(get_property(graph,boost::graph_name));
+      dp.property("name", gname);
+
+      boost::property_map<graph_t, boost::vertex_my_colour_t>::type my_colour =
+        get(boost::vertex_my_colour, graph);
+      dp.property("color", my_colour);
+
+      std::istringstream gvgraph(argv[1]);
+      boost::read_graphviz(gvgraph,graph,dp,"node_id");
+      boost::write_graphviz_dp(std::cout, graph, dp);
+    }
+
+Compile and run with:
+
+    $ clang++ bgl_custom_type.cpp -lboost_graph -lboost_regex
+    $ ./a.out 'digraph { graph [name = "graphname"]  a c e [color="red"] }' | tee out.dot
+    digraph G {
+    name=graphname;
+    a [color=blue];
+    c [color=blue];
+    e [color=red];
+    }
+    $  dot -Tpng out.dot > out.png; viewnior out.png
+

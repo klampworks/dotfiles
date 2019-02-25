@@ -1,0 +1,34 @@
+#! /usr/bin/env stap
+
+global idx
+global callstack
+
+function enter() {
+  f = ppfunc()
+  printf("\"%s\" -> \"%s\";\n", callstack[idx], f)
+
+  idx += 1
+  callstack[idx] = f
+}
+
+function ret() {
+  idx -= 1
+}
+
+function mknode(obj, fun) {
+    printf("%s[URL=\"%s\"][label=\"%s\"];\n", fun, obj, fun);
+}
+
+probe process(@1).function("*").call {
+  //f = ppfunc()
+  //if (f !~ "^_") {
+  //  // Use weight here
+  //  mknode(@1, f)
+  //}
+  enter()
+}
+
+probe process(@1).function("*").return {
+  ret()
+}
+

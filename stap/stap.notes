@@ -1,0 +1,195 @@
+Sytemtap is a tool part of the Linux kernel for gathering information from a running Linux system. Although it was first created to help diagnose kernel issues it now supports userspace analysis too.
+
+Systemtap includes and command line interface and scripting language we can use to run artibrarty code when a function is called. Systemtap is capable and doing much more but this is all we need to build a dynamic callgraph.
+
+Before we start there is one key limitation that should be made clear. This method relies on an executable not being `strip`ed. It does not need to have full debug sybols but it does need function symbols (denoted by `F` in `objdump`). These are included by default in applications compiled with or without the debug flag.
+
+Systemtap scripts typically have the `.stp` extension and the shebang `#! /usr/bin/env stap`.
+
+`probe process("PATH")`
+
+The `probe` keyword is to set up a block of code to be called when a specific condition is met. For analysing userspace executables we use the `process` event which takes the path to an executable. Systemtap makes use of the `PATH` environmental variable so it is ok to add executable names here as you would in a command shell.
+
+Ideally we want to parameterise this `PATH` value so that we can supply it on the command line without modifying the script. Systemtap exposes integer command line arguments as `$1`, `$2`. `$3` etc. and string arguments as `@1`, `@2`, `@3` etc. So the following will take the first commandline argument as a string and use it as the path to the executable we want to analyse.
+
+`probe process(@1)`
+
+
+`probe process(@1).function("function")`
+
+This can be filtered by function name by appending `.function()`. The wildcard character `"*"` can be used to match against all function names. Note that if the provided function name does not exist then `stap` will bomb out with the following error message `semantic error: while resolving probe point: identifier 'process'`. This will also happen in the case of the wildcard (`"*"`) if the executable file has been `strip`ed of all function symbols.
+
+`probe process("PATH").function("function").call`
+
+Append `.call()` to indicate that this code should only be run once when a function is called. There is also a `.return()` for calling code when a function returns.
+
+After the `probe` keyword and event/conditions we include the code to run within braces (`{` ... `}`).
+
+To print out a simple callgraph we can keep a stack of previous function calls. When a function is called we print out an arrow from the function name at the top of our stack to this new function. Then we push the new function name onto the stack. When a function returns we pop the stack.
+
+The name of the current function is returned by the `ppfunc()` function and the result can be assigned to a local variable like this. The systemtap scripting language infers type (in this case `string`) automatically.
+
+`f = ppfunc()`
+
+We need two global variables, one for the stack (which is just an array) we name `callstack` and one for an index for the top of the stack which we name `idx`. Again, type is inferred by how we use the variables.
+
+`global idx`
+`global callstack`
+
+Much of the Systemtap script syntax is similar to the `C` programming language. Array indexing is done by square brackets `[` and `]` and values can be written to `stdout` using the `printf` function.
+
+`printf("\"%s\" -> \"%s\";\n", callstack[idx], f)`
+
+We can then increment `idx` and "push" the current function name onto the stack with the following two lines.
+
+    idx += 1
+    callstack[idx] = f
+
+In the `.return()` block we simply decrement the `idx` variable to "pop" the top function.
+
+An astute reader may notice that for the first function called, the `printf` line will attempt to dereference `callstack[0]` which we have not assigned a value to. The Systemtap script automatically initialises variables to either `0` or the empty string so this code is perfectly ok.
+
+If it makes you feel better, it is possible to initialise `callstack[0]` and `idx` once when the script starts with the `probe begin` event.
+
+    probe begin {
+      callstack[0] = ""
+      idx = 0
+    }
+
+Putting it all together we have a simple script.
+
+    #! /usr/bin/env stap
+
+    global idx
+    global callstack
+
+    probe process(@1).function("*").call {
+
+      f = ppfunc()
+      printf("\"%s\" -> \"%s\";\n", callstack[idx], f)
+
+      idx += 1
+      callstack[idx] = f
+    }
+
+    probe process(@1).function("*").return {
+      idx -= 1
+    }
+
+We can use the following C program as a test:
+
+    void i() {}
+    void h() {}
+    void g() {
+      i();
+    }
+
+    void c() {
+      g();
+    }
+
+    void f() {
+      g();
+      h();
+    }
+
+    void b() {
+      f();
+    }
+
+    void e() {}
+
+    void d() {
+      e();
+    }
+
+    void a() {
+      d();
+    }
+
+    void MAIN()
+    {
+      a();
+      b();
+      c();
+    }
+
+    int main()
+    {
+      MAIN();
+      MAIN();
+    }
+
+Usage:
+
+    clang test.c
+    sudo stap simple_callgraph.stp a.out
+    # stap will now wait for a.out to be run
+
+    # In another terminal
+    ./a.out
+
+    # stap will still be waiting, stop it safely with CTRL-C.
+
+The terminal that ran `stap` will have output similar to the following:
+
+    "" -> "_start";
+    "_start" -> "__libc_csu_init";
+    "__libc_csu_init" -> "_init";
+    "_start" -> "main";
+    "main" -> "MAIN";
+    "MAIN" -> "a";
+    "a" -> "d";
+    "d" -> "e";
+    "MAIN" -> "b";
+    "b" -> "f";
+    "f" -> "g";
+    "g" -> "i";
+    "f" -> "h";
+    "MAIN" -> "c";
+    "c" -> "g";
+    "g" -> "i";
+    "main" -> "MAIN";
+    "MAIN" -> "a";
+    "a" -> "d";
+    "d" -> "e";
+    "MAIN" -> "b";
+    "b" -> "f";
+    "f" -> "g";
+    "g" -> "i";
+    "f" -> "h";
+    "MAIN" -> "c";
+    "c" -> "g";
+    "g" -> "i";
+    "_start" -> "_fini";
+
+Ok but where's my callgraph?
+The above output is actually valid [dot](http://www.graphviz.org/content/dot-language) syntax. If we slap on an appropriate header and footer and run it through a tool like `dot` it will be converted into an image we can view.
+
+    out=output.dot
+    > "$out"
+    echo 'digraph code {' >> "$out"
+    echo 'graph [bgcolor=white fontsize=8 fontname="Courier"];' >> "$out"
+    echo 'node [fillcolor=gray style=filled shape=box];' >> "$out"
+    echo 'edge [arrowhead="vee"];' >> "$out"
+
+    # Uncomment if running from a script to continue script after CTRL-C.
+    #trap ' ' INT
+
+    sudo stap simple_callgraph.stp a.out >> "$out"
+    # Don't for get to CTRL-C after running the executable in another terminal
+
+    echo '}' >> "$out"
+
+    dot -Tpng "$out" > callgraph.png
+    viewnior callgraph.png
+
+Dude what's with all the arrows?
+
+There is one simple flaw in this approach and that is we get an arrow for each time a function is called which can get very messy very quickly. Since we only care about which functions called which other functions and not how many times we can simply remove the duplicates by piping the output into `sort` and `uniq`. Since tools like `sort` block until the pipe is closed and we using CTRL-C to stop `stap` we will need and intermediate file.
+
+    sudo stap simple_callgraph.stp a.out > tmp.dot
+    sort tmp.dot | uniq >> "$out"
+
+
+
