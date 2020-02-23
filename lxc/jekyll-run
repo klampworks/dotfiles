@@ -1,0 +1,26 @@
+#!/bin/bash
+mkdir -p ro rw rootfs.live
+mount ./jekyll-rootfs.sqfs ro/
+mount -t tmpfs none rw/
+mkdir -p rw/root rw/work
+chmod -R 777 rw # important or non-root inside contain has no access
+mount -t overlay overlay \
+  -o lowerdir=ro/,upperdir=rw/root/,workdir=rw/work rootfs.live/
+
+mount --bind /home/user/beelzebub/klamp.works/ rootfs.live/home/user/
+
+brctl addbr brjekyll &> /dev/null
+ifconfig brjekyll 10.0.10.1 netmask 255.255.255.0 &> /dev/null
+
+cat << EOF > rw/root/init
+#!/bin/bash
+exec su - user -c 'set -m; jekyll server'
+EOF
+chmod a+x rw/root/init
+
+lxc-start -P $(pwd)/../ -n "$(basename "$(pwd)")" -F --logfile lxc.log -- /init
+
+umount rootfs.live/home/user
+umount rootfs.live
+umount rw
+umount ro
