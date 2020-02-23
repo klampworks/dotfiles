@@ -1,0 +1,15 @@
+#!/bin/bash
+if [[ -z "$1" || -z "$2" ]]
+then
+  echo "Usage: $0 <file> <user>"
+  exit 1
+fi
+
+if [[ ! -e "/home/$2" ]]
+then
+  echo "error no destination /home/$2" 
+  exit 2
+fi
+
+mv "$1" "/home/$2/"
+chown "$2:$2" "/home/$2/$(basename $1)"
