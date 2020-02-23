@@ -1,0 +1,17 @@
+#!/bin/bash
+if [[ -z "$1" ]]
+then
+  echo "Usage: $0 <other user> [display]"
+  exit
+fi
+
+test -z "$2" && d=":0" || d="$2"
+
+read a b c <<< $(xauth list | grep "^localhost/unix${d} ")
+[[ "$a" = localhost\/unix${d} ]] || exit 1
+[[ "$b" = MIT-MAGIC-COOKIE-1 ]] || exit 2
+[[ "$c" =~ ^[0-9a-f]{32}$ ]] || exit 3
+
+sudo -u "$1" /usr/bin/truncate -s 0 /home/${1}/.Xauthority
+sudo -u "$1" XAUTHORITY=/home/${1}/.Xauthority /usr/bin/xauth add "$a" "$b" "$c"
+sudo -u "$1" XAUTHORITY=/home/${1}/.Xauthority xauth generate "$d"

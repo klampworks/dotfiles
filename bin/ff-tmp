@@ -1,0 +1,12 @@
+#!/bin/bash
+u=tmp
+if [[ ! -d "/home/${u}" ]]
+then
+  echo "error: create user $u first"
+  exit 1
+fi
+
+sudo mount -t tmpfs none /home/${u}
+"$(realpath "$(dirname "$0")")/share-screen-with" ${u}
+sudo -u tmp XAUTHORITY=/home/${u}/.Xauthority firefox --no-remote
+sudo umount /home/${u}
