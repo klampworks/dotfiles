@@ -1,0 +1,53 @@
+#!/bin/bash
+
+NAME=""
+TIMES=1
+
+usage() {
+  echo "Usage: $0 [ -n NAME ] [ -t TIMES ]" 1>&2
+}
+
+while getopts ":n:t:" options
+do
+  case "${options}" in
+    n)
+      NAME=${OPTARG}
+      ;;
+    t)
+      TIMES=${OPTARG}
+      if ! [[ $TIMES =~ ^[0-9]+$ ]]
+      then
+        echo "Error: TIMES must be a positive, whole number."
+        usage ; exit 1
+      elif [ $TIMES -eq "0" ]
+      then
+        echo "Error: TIMES must be greater than zero."
+        usage ; exit 1
+      fi
+      ;;
+    :)
+      echo "Error: -${OPTARG} requires an argument."
+      usage ; exit 1
+      ;;
+    *)
+      usage ; exit 1
+      ;;
+  esac
+done
+
+if [ "$NAME" = "" ]; then
+  STRING="Hi!"
+else
+  STRING="Hi, $NAME!"
+fi
+
+COUNT=1
+while [ $COUNT -le $TIMES ]; do
+
+  echo $STRING
+  let COUNT+=1
+done
+
+exit 0
+
+
