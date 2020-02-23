@@ -1,5 +1,52 @@
 scriptencoding utf-8
 
+"http://inlehmansterms.net/2014/10/31/debugging-vim/
+"set verbose=15
+"set verbosefile=~/.vim.log
+
+set nocompatible              " be iMproved, required
+filetype off                  " required
+
+if !has("nvim")
+
+  set rtp+=~/.vim/bundle/Vundle.vim
+  call vundle#begin()
+  Plugin 'Valloric/YouCompleteMe'
+  call vundle#end()            " required
+  "filetype plugin indent on    " required
+
+  "let g:ycm_global_ycm_extra_conf="~/.vim/.ycm_extra_conf.py"
+  "let g:ycm_confirm_extra_conf=1
+  "let g:ycm_auto_trigger=1
+  let g:ycm_add_preview_to_completeopt=0
+endif
+
+" I get a weird window at the top of my file when I use the semantic engine
+" 
+" This is Vim's preview window. Vim uses it to show you extra information about
+" something if such information is available. YCM provides Vim with such extra
+" information. For instance, when you select a function in the completion list,
+" the preview window will hold that function's prototype and the prototypes of
+" any overloads of the function. It will stay there after you select the
+" completion so that you can use the information about the parameters and their
+" types to write the function call.
+" 
+" If you would like this window to auto-close after you select a completion
+" string, set the g:ycm_autoclose_preview_window_after_completion option to 1 in
+" your vimrc file. Similarly, the g:ycm_autoclose_preview_window_after_insertion
+" option can be set to close the preview window after leaving insert mode.
+" 
+" If you don't want this window to ever show up, add set completeopt-=preview to
+" your vimrc. Also make sure that the g:ycm_add_preview_to_completeopt option is
+" set to 0.
+set completeopt-=preview
+" FUCK OFF AND DIE
+
+set csprg=gtags-cscope
+if filereadable("GTAGS")
+  cs add GTAGS
+endif
+
 " Highlight search terms.
 set hlsearch
 
@@ -133,8 +180,157 @@ ruby <<EOF
 EOF
 endfunction
 
-nmap <C-b> :call Banner()<CR>
+function! Man(page)
+  "Create a new unnamed buffer to display our splash screen inside of.
+  tabnew
 
+  " Set some options for this buffer to make sure that does not act like a
+  " normal winodw.
+  setlocal
+    \ bufhidden=wipe
+    \ buftype=nofile
+    \ nobuflisted
+    \ nocursorcolumn
+    \ nocursorline
+    \ nolist
+    \ nonumber
+    \ noswapfile
+    \ norelativenumber
+
+  " Our message goes here. Mine is simple.
+  "call append('$', "hello")
+  exec ":r !man" a:page
+
+  " When we are done writing out message set the buffer to readonly.
+  setlocal
+    \ nomodifiable
+    \ nomodified
+
+  "" Just like with the default start page, when we switch to insert mode
+  "" a new buffer should be opened which we can then later save.
+  "nnoremap <buffer><silent> e :enew<CR>
+  "nnoremap <buffer><silent> i :enew <bar> startinsert<CR>
+  "nnoremap <buffer><silent> o :enew <bar> startinsert<CR>
+endfunction
+
+" Without the range keyword, function will run once per Visual selected line
+function! Box() range
+ruby <<EOF
+
+  def box
+    _, st_lnum, st_col, _ = Vim::evaluate("getpos(\"'<\")")
+    _, en_lnum, en_col, _ = Vim::evaluate("getpos(\"'>\")")
+
+    longest = 0
+    (st_lnum..en_lnum).each do |i|
+      l = $curbuf[i].length
+      longest = l if l > longest
+    end
+
+    (st_lnum..en_lnum).each do |i|
+      l = $curbuf[i].length
+      d = longest - l
+      pl = d / 2
+      pr = d / 2 + if d % 2 == 0 then 0 else 1 end
+      $curbuf[i] = "| #{' ' * pl}#{$curbuf[i]}#{' ' * pr} |"
+    end
+
+    $curbuf.append(st_lnum-1, "+-#{'-' * longest}-+")
+    $curbuf.append(en_lnum+1, "+-#{'-' * longest}-+")
+  end
+
+  box
+EOF
+endfunction
+
+function! UnBox() range
+ruby <<EOF
+
+  def unbox
+    _, st_lnum, st_col, _ = Vim::evaluate("getpos(\"'<\")")
+    _, en_lnum, en_col, _ = Vim::evaluate("getpos(\"'>\")")
+
+    (st_lnum..en_lnum).each do |i|
+      $curbuf[i] = $curbuf[i].sub(/^\| +/, '')
+      $curbuf[i] = $curbuf[i].sub(/ +\|/, '')
+      $curbuf[i] = $curbuf[i].sub(/^\+-+\+/, '')
+    end
+  end
+
+  unbox
+EOF
+endfunction
+
+function! JiraCommentRef()
+ruby <<EOF
+  def jira_comment_ref
+    line = $curbuf.line
+    if /(?<id>comment-\d+)$/ =~ line then
+      $curbuf.line = "[#{id}|#{line}]"
+    end
+  end
+
+  jira_comment_ref
+EOF
+endfunction
+
+function! JiraQuote() range
+ruby <<EOF
+  def jira_quote
+    _, st_lnum, st_col, _ = Vim::evaluate("getpos(\"'<\")")
+    _, en_lnum, en_col, _ = Vim::evaluate("getpos(\"'>\")")
+
+    (st_lnum..en_lnum).each do |i|
+      $curbuf[i] = "{color:#00875a}>#{$curbuf[i]}{color}"
+    end
+  end
+
+  jira_quote
+EOF
+endfunction
+
+function! JiraRbLink() range
+ruby <<EOF
+  def rb_link
+    _, st_lnum, st_col, _ = Vim::evaluate("getpos(\"'<\")")
+    _, en_lnum, en_col, _ = Vim::evaluate("getpos(\"'>\")")
+
+    if st_lnum != en_lnum then
+      puts "A multiline hyperlink? I don't think so, human."
+      return
+    end
+
+    ref = $curbuf[st_lnum][(st_col-1)..(en_col-1)]
+    if ref !~ /^\/r\/\d+$/ then
+      puts "What the heck is #{ref}?"
+      puts "Try something like /r/12345"
+      return
+    end
+
+    st = st_col-2
+    st = 0 if st < 0
+
+    if st_col > 1 then
+      st = $curbuf[st_lnum][0..(st_col - 2)]
+    else
+      st = ""
+    end
+    en = $curbuf[st_lnum][(en_col)..-1]
+
+    $curbuf[st_lnum] = st +
+      "[#{ref}|https://reviewboard.solarflarecom.com#{ref}]" +
+      en
+  end
+
+  rb_link
+EOF
+endfunction
+
+nmap <C-b> :call Banner()<CR>
+vmap <C-b> :call Box()<CR>
+noremap K :call Man(expand("<cword>"))<cr>
+
+"so $MYVIMRC
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -253,3 +449,41 @@ augroup END
 endif " has("autocmd")
 " }}}
 
+nnoremap <C-o> :set invpaste paste?<CR>
+set pastetoggle=<C-o>
+set showmode
+
+highlight DiffAdd    ctermbg=234
+highlight DiffDelete ctermbg=234
+highlight DiffChange ctermbg=234
+highlight DiffText   ctermbg=88
+"highlight DiffAdd    cterm=bold ctermfg=10 ctermbg=17
+"highlight DiffDelete cterm=bold ctermfg=10 ctermbg=17
+"highlight DiffChange cterm=bold ctermfg=10 ctermbg=17
+"highlight DiffText   cterm=bold ctermfg=10 ctermbg=88
+"
+"reload vimrc
+" :so $MYVIMRC
+
+" block append do not use $ before or after the block select
+"
+" 1. manually extend first line to desired length
+" a   =>   a   
+" bb  =>   bb
+" a   =>   a
+" bbc =>   bbc
+" a   =>   a
+"
+" 2. Go to end of first line with l *not $*, C-v, jjjj, A, text...
+" a   =>   a   |
+" bb  =>   bb  |
+" a   =>   a   |
+" bbc =>   bbc |
+" a   =>   a   |
+"
+" 3. Navigating to end of line with $ causes this
+" a   =>   a   |
+" bb  =>   bb|
+" a   =>   a|
+" bbc =>   bbc|
+" a   =>   a|
